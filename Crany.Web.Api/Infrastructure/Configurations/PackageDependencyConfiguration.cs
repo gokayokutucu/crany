@@ -12,16 +12,12 @@ public class PackageDependencyConfiguration : IEntityTypeConfiguration<PackageDe
 
         builder.Property(pd => pd.DependencyName)
             .IsRequired()
-            .HasMaxLength(100);
+            .HasMaxLength(256);
 
-        builder.Property(pd => pd.PreReleaseTag)
-            .HasMaxLength(20);
-
-        builder.Property(pd => pd.BuildMetadata)
-            .HasMaxLength(50);
-
-        builder.HasOne(pd => pd.Package)
-            .WithMany(p => p.Dependencies)
-            .HasForeignKey(pd => pd.PackageId);
+        builder.Property(pd => pd.MajorVersion).IsRequired();
+        builder.Property(pd => pd.MinorVersion).IsRequired();
+        builder.Property(pd => pd.PatchVersion).IsRequired();
+        builder.Property(pd => pd.PreReleaseTag).HasMaxLength(20);
+        builder.Property(pd => pd.BuildMetadata).HasMaxLength(20);
     }
 }

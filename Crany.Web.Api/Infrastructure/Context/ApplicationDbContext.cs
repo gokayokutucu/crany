@@ -21,7 +21,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         modelBuilder.ApplyConfiguration(new PackageConfiguration());
         modelBuilder.ApplyConfiguration(new PackageDependencyConfiguration());
-        modelBuilder.ApplyConfiguration(new ProtoFileConfiguration());
+        modelBuilder.ApplyConfiguration(new FileConfiguration());
         modelBuilder.ApplyConfiguration(new UserPackageConfiguration());
     }
 }
