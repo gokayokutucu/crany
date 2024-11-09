@@ -398,5 +398,11 @@ FodyWeavers.xsd
 *.sln.iml
 *.idea
 
+#certificates
+*.crt
+*.pfx
+*.pem
+*.csr
+
 # MacOs
 .DS_Store
