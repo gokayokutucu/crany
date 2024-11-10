@@ -1,6 +1,6 @@
-using Crany.Web.Api.Infrastructure.Entities.Enums;
+using Crany.Domain.Entities.Enums;
 
-namespace Crany.Web.Api.Infrastructure.Entities;
+namespace Crany.Domain.Entities;
 
 public class File
 {
@@ -8,8 +8,8 @@ public class File
     public int PackageId { get; set; }
     public Package Package { get; set; }
     public string FileName { get; set; }
-    public string Content { get; set; } // Dosyanın içeriği
-    public string TargetPath { get; set; } // Dosya dizini
+    public string Content { get; set; } // Content of the file
+    public string TargetPath { get; set; } // File path in the package
     public FileType Type { get; set; }
     public string? Description { get; set; }
     public string? Title { get; set; }

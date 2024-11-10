@@ -1,4 +1,4 @@
-namespace Crany.Web.Api.Infrastructure.Entities;
+namespace Crany.Domain.Entities;
 
 public class Package
 {
@@ -10,7 +10,7 @@ public class Package
     public string? PreReleaseTag { get; set; }
     public string? BuildMetadata { get; set; }
     public string? Description { get; set; }
-    public string? Authors { get; set; }  // .nuspec'in Authors alanı
+    public string? Authors { get; set; }  // .nuspec Authors
     public string? ProjectUrl { get; set; }
     public string? LicenseUrl { get; set; }
     public string? IconUrl { get; set; }
@@ -26,7 +26,7 @@ public class Package
     public string? AlternatePackageVersion { get; set; }
     public string? Readme { get; set; }
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
-    public int DownloadCount { get; set; } = 0; // İndirilmeleri izlemek için yeni alan
+    public int DownloadCount { get; set; } = 0; // Number of downloads
     public ICollection<PackageDependency> Dependencies { get; set; } = new List<PackageDependency>();
     public ICollection<File> Files { get; set; } = new List<File>();
     public ICollection<UserPackage> UserPackages { get; set; } = new List<UserPackage>();

@@ -1,4 +1,4 @@
-namespace Crany.Web.Api.Infrastructure.Entities;
+namespace Crany.Domain.Entities;
 
 public class PackageDependency
 {

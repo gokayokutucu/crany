@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using File = Crany.Web.Api.Infrastructure.Entities.File;
+using File = Crany.Domain.Entities.File;
 
 namespace Crany.Web.Api.Infrastructure.Configurations;
 

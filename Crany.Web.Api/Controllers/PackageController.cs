@@ -1,9 +1,10 @@
 using System.IO.Compression;
+using Crany.Domain.Entities;
 using Crany.Web.Api.Infrastructure.Context;
-using Crany.Web.Api.Infrastructure.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using File = Crany.Web.Api.Infrastructure.Entities.File;
+using File = Crany.Domain.Entities.File;
 
 namespace Crany.Web.Api.Controllers;
 
@@ -11,6 +12,14 @@ namespace Crany.Web.Api.Controllers;
 [ApiController]
 public class PackageController(ApplicationDbContext context) : ControllerBase
 {
+    [HttpGet("test")]
+    [Authorize]
+    public async Task<IActionResult> GetTest()
+    {
+        
+        return Ok("Test");
+    }
+    
     [HttpGet]
     public async Task<IActionResult> GetAllPackages()
     {
@@ -74,24 +83,21 @@ public class PackageController(ApplicationDbContext context) : ControllerBase
         if (packageFile == null || packageFile.Length == 0)
             return BadRequest("No package file provided.");
 
-        // `.nupkg` dosyasını belirli bir dizine kaydedin
         var savePath = Path.Combine("PackageStorage", packageFile.FileName);
         Directory.CreateDirectory("PackageStorage");
 
         await using var fileStream = new FileStream(savePath, FileMode.Create);
         await packageFile.CopyToAsync(fileStream);
 
-        // Paket meta verilerini ve proto dosya içeriklerini işle
         var (package, protoFiles) = ExtractPackageAndProtoFiles(savePath);
         if (package == null)
             return BadRequest("Failed to extract package metadata or proto files.");
 
-        // Veritabanına paketi ve proto dosyalarını kaydet
         context.Packages.Add(package);
         foreach (var protoFile in protoFiles)
         {
             protoFile.Package = package;
-            context.ProtoFiles.Add(protoFile);
+            context.Files.Add(protoFile);
         }
         await context.SaveChangesAsync();
 
@@ -131,7 +137,7 @@ public class PackageController(ApplicationDbContext context) : ControllerBase
                 CreatedDate = DateTime.UtcNow
             };
 
-            // `.proto` dosyalarını çıkar ve ProtoFile entity'lerine dönüştür
+            // Export `.proto` files
             var protoFiles = new List<File>();
             foreach (var entry in archive.Entries.Where(e => e.FullName.EndsWith(".proto")))
             {

@@ -1,5 +1,5 @@
+using Crany.Domain.Entities;
 using Crany.Web.Api.Infrastructure.Context;
-using Crany.Web.Api.Infrastructure.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 

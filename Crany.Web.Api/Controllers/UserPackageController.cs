@@ -1,18 +1,33 @@
+using Crany.Domain.Entities;
 using Crany.Web.Api.Infrastructure.Context;
-using Crany.Web.Api.Infrastructure.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Crany.Web.Api.Controllers;
 
 [Route("api/v3/user/packages")]
 [ApiController]
-public class UserPackageController(ApplicationDbContext context) : ControllerBase
+public class UserPackageController : ControllerBase
 {
-    [HttpGet("{userId}")]
-    public async Task<IActionResult> GetUserPackages(string userId)
+    private readonly ApplicationDbContext _context;
+
+    public UserPackageController(ApplicationDbContext context)
     {
-        var userPackages = await context.UserPackages
+        _context = context;
+    }
+
+    private string GetUserIdFromToken()
+    {
+        return User.FindFirst("uid")?.Value ?? throw new UnauthorizedAccessException("User ID not found in token.");
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetUserPackages()
+    {
+        var userId = GetUserIdFromToken();
+
+        var userPackages = await _context.UserPackages
             .Where(up => up.UserId == userId)
             .Include(up => up.Package)
             .ToListAsync();
@@ -23,21 +38,28 @@ public class UserPackageController(ApplicationDbContext context) : ControllerBas
     [HttpPost]
     public async Task<IActionResult> AddUserPackage([FromBody] UserPackage userPackage)
     {
-        context.UserPackages.Add(userPackage);
-        await context.SaveChangesAsync();
+        userPackage.UserId = GetUserIdFromToken();
         
-        return CreatedAtAction(nameof(GetUserPackages), new { userId = userPackage.UserId }, userPackage);
+        _context.UserPackages.Add(userPackage);
+        await _context.SaveChangesAsync();
+        
+        return CreatedAtAction(nameof(GetUserPackages), userPackage);
     }
 
     [HttpDelete("{userPackageId}")]
     public async Task<IActionResult> RemoveUserPackage(int userPackageId)
     {
-        var userPackage = await context.UserPackages.FindAsync(userPackageId);
+        var userId = GetUserIdFromToken();
+
+        var userPackage = await _context.UserPackages
+            .Where(up => up.Id == userPackageId && up.UserId == userId)
+            .FirstOrDefaultAsync();
+
         if (userPackage == null)
             return NotFound();
-        
-        context.UserPackages.Remove(userPackage);
-        await context.SaveChangesAsync();
+
+        _context.UserPackages.Remove(userPackage);
+        await _context.SaveChangesAsync();
         
         return NoContent();
     }
