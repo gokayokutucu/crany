@@ -25,6 +25,9 @@ public class Package
     public string? AlternatePackage { get; set; }
     public string? AlternatePackageVersion { get; set; }
     public string? Readme { get; set; }
+    public string? RepositoryType { get; set; }
+    public string? RepositoryUrl { get; set; }
+    public bool IsVisible { get; set; } = true;
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public int DownloadCount { get; set; } = 0; // Number of downloads
     public ICollection<PackageDependency> Dependencies { get; set; } = new List<PackageDependency>();
