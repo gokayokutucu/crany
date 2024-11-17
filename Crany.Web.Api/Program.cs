@@ -1,13 +1,32 @@
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using Crany.Common.Filters;
+using Crany.Shared.Attributes;
+using Crany.Shared.Filters;
+using Crany.Shared.Swagger.Filters;
+using Crany.Web.Api;
+using Crany.Web.Api.Extensions;
 using Crany.Web.Api.Infrastructure.Context;
+using Crany.Web.Api.Services;
+using Crany.Web.Api.Services.Abstractions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using Microsoft.AspNetCore.Mvc.Versioning;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Host.UseSerilog((context, services, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext();
+});
 
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
@@ -17,8 +36,25 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
     });
 });
 
+builder.Services.AddApiVersioning(options =>
+{
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.DefaultApiVersion = new ApiVersion(3, 0);
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = ApiVersionReader.Combine(
+        new UrlSegmentApiVersionReader(), // URL based
+        new HeaderApiVersionReader("x-api-version") // Header based
+    );
+});
+builder.Services.AddVersionedApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV"; // "v1", "v2" etc.
+    options.SubstituteApiVersionInUrl = true;
+});
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -38,22 +74,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             OnAuthenticationFailed = context =>
             {
-                Console.WriteLine("Authentication failed: " + context.Exception.Message);
+                Log.Error("Authentication failed: {Message}", context.Exception.Message);
                 return Task.CompletedTask;
             },
             OnTokenValidated = context =>
             {
-                Console.WriteLine("Token validated for user: " + context.Principal.Identity.Name);
+                Log.Information("Token validated for user: {User}", context.Principal?.Identity?.Name);
                 return Task.CompletedTask;
             },
             OnChallenge = context =>
             {
-                Console.WriteLine("OnChallenge triggered: Authorization header is missing or token is invalid");
+                Log.Warning("Authorization challenge triggered: {Message}", context.Error);
                 return Task.CompletedTask;
             },
             OnMessageReceived = context =>
             {
-                Console.WriteLine("Message received: " + context.Token);
+                Log.Debug("Message received: {Token}", context.Token);
                 return Task.CompletedTask;
             }
         };
@@ -61,12 +97,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 // Add services to the container.
 builder.Services.AddControllers();
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
+    c.SwaggerDoc("v2", new OpenApiInfo { Title = "Repository Manager API", Version = "v2" });
     c.SwaggerDoc("v3", new OpenApiInfo { Title = "Repository Manager API", Version = "v3" });
-
+    c.OperationFilter<SwaggerDefaultValues>(); 
+    
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -95,15 +134,26 @@ builder.Services.AddSwaggerGen(c =>
     c.OperationFilter<AuthorizeCheckOperationFilter>();
 });
 
+builder.Services.AddHealthChecks();
+
+builder.Services.AddGrpcClient(builder.Configuration);
+
+builder.Services.AddScoped<IPushPackageService, PushPackageService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+    var apiVersionDescriptionProvider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+    
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v3/swagger.json", "Repository Manager API V3");
+        foreach (var v in apiVersionDescriptionProvider.ApiVersionDescriptions.Select(t=> t.GroupName).Reverse())
+        {
+            c.SwaggerEndpoint($"/swagger/{v}/swagger.json","Repository Manager API " + v );
+        }
         c.RoutePrefix = "swagger";
     });
 }
@@ -117,6 +167,22 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapHealthChecks("/health");
+
+app.UseMiddleware<RequestLoggingMiddleware>();
+
 app.MapControllers();
 
-await app.RunAsync();
+try
+{
+    Log.Information("Starting web application");
+    await app.RunAsync();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Host terminated unexpectedly");
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}

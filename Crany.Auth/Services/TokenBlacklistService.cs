@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
-using Crany.Auth.Application.Services.Abstractions;
+using Crany.Auth.Services.Abstractions;
 using Microsoft.Extensions.Caching.Memory;
 
-namespace Crany.Auth.Application.Services;
+namespace Crany.Auth.Services;
 
 public class TokenBlacklistService(IMemoryCache memoryCache) : ITokenBlacklistService
 {

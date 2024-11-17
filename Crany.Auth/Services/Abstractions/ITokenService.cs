@@ -1,6 +1,6 @@
-using Crany.Auth.Infrastructure.Entities;
+using Crany.Shared.Entities.Identity;
 
-namespace Crany.Auth.Application.Services.Abstractions;
+namespace Crany.Auth.Services.Abstractions;
 
 public interface ITokenService
 {

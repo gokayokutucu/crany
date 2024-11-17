@@ -1,21 +1,33 @@
 using System.Text;
-using Crany.Auth.Application.Services;
-using Crany.Auth.Application.Services.Abstractions;
 using Crany.Auth.Infrastructure.Contexts;
-using Crany.Auth.Infrastructure.Entities;
-using Crany.Common.Filters;
+using Crany.Auth.Services;
+using Crany.Auth.Services.Abstractions;
+using Crany.Shared.Abstractions.Context;
+using Crany.Shared.Entities.Identity;
+using Crany.Shared.Filters;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File("Logs/log-.txt", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
+builder.Host.UseSerilog(); // Use Serilog as the logging provider
+
 // Add services to the container.
 
-builder.Services.AddDbContext<AuthDbContext>(options =>
+builder.Services.AddDbContext<IAuthDbContext, AuthDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
@@ -52,22 +64,22 @@ builder.Services
         {
             OnAuthenticationFailed = context =>
             {
-                Console.WriteLine("Authentication failed: " + context.Exception.Message);
+                Log.Error("Authentication failed: {Message}", context.Exception.Message);
                 return Task.CompletedTask;
             },
             OnTokenValidated = context =>
             {
-                Console.WriteLine("Token validated for user: " + context.Principal.Identity.Name);
+                Log.Information("Token validated for user: {User}", context.Principal?.Identity?.Name);
                 return Task.CompletedTask;
             },
             OnChallenge = context =>
             {
-                Console.WriteLine("OnChallenge triggered: Authorization header is missing or token is invalid");
+                Log.Warning("Authorization challenge triggered: {Message}", context.Error);
                 return Task.CompletedTask;
             },
             OnMessageReceived = context =>
             {
-                Console.WriteLine("Message received: " + context.Token);
+                Log.Debug("Message received: {Token}", context.Token);
                 return Task.CompletedTask;
             }
         };
@@ -81,7 +93,13 @@ builder.Services.AddAuthorization(options =>
         .Build();
 });
 
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 1048576; // 1 MB File Limit
+});
+
 builder.Services.AddMemoryCache();
+builder.Services.AddGrpc();
 builder.Services.AddSingleton<ITokenBlacklistService, TokenBlacklistService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 
@@ -138,17 +156,9 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.Use(async (context, next) =>
-{
-    Console.WriteLine("Headers:");
-    foreach (var header in context.Request.Headers)
-    {
-        Console.WriteLine($"{header.Key}: {header.Value}");
-    }
-    await next();
-});
-
 app.MapControllers();
+    
+app.MapGrpcService<AuthServiceImpl>();
 
 await SeedDatabase(app);
 

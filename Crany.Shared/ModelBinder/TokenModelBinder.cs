@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
-namespace Crany.Common.ModelBinder;
+namespace Crany.Shared.ModelBinder;
 
 public class TokenModelBinder : IModelBinder
 {

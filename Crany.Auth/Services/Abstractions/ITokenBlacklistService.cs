@@ -1,4 +1,4 @@
-namespace Crany.Auth.Application.Services.Abstractions;
+namespace Crany.Auth.Services.Abstractions;
 
 public interface ITokenBlacklistService
 {

@@ -1,13 +1,15 @@
-using Crany.Domain.Entities.Enums;
+using Crany.Shared.Enums;
 using Crany.Web.Api.Infrastructure.Context;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using File = Crany.Domain.Entities.File;
+using File = Crany.Shared.Entities.File;
 
 namespace Crany.Web.Api.Controllers;
 
-[Route("api/v3/packages/{packageId}/files")]
+[Route("api/v{version:apiVersion}/packages/{packageId}/files")]
 [ApiController]
+[ApiVersion("3.0", Deprecated = false)]
+[ApiExplorerSettings(GroupName = "v3", IgnoreApi = false)]
 public class FilesController(ApplicationDbContext context) : ControllerBase
 {
     [HttpGet]

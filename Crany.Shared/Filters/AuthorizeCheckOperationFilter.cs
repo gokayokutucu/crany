@@ -1,7 +1,7 @@
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
-namespace Crany.Common.Filters;
+namespace Crany.Shared.Filters;
 
 public class AuthorizeCheckOperationFilter : IOperationFilter
 {

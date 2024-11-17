@@ -1,11 +1,12 @@
-using Crany.Domain.Entities;
+using Crany.Shared.Entities;
 using Crany.Web.Api.Infrastructure.Context;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Crany.Web.Api.Controllers;
 
-[Route("api/v3/packages/{packageId}/dependencies")]
+[ApiVersionNeutral]
+[Route("api/packages/{packageId}/dependencies")]
 [ApiController]
 public class PackageDependencyController(ApplicationDbContext context) : ControllerBase
 {

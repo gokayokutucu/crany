@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option csharp_namespace = "Crany.Shared.Protos";
+
+service AuthService {
+  rpc GetUserIdByApiKey(GetUserIdByApiKeyRequest) returns (UserIdByApiKeyResponse);
+}
+
+message GetUserIdByApiKeyRequest {
+  string apiKey = 1;
+}
+
+message UserIdByApiKeyResponse {
+  bool isValid = 1;
+  string userId = 2;
+  string message = 3;
+}

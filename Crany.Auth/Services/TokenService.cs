@@ -2,12 +2,12 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using Crany.Auth.Application.Services.Abstractions;
-using Crany.Auth.Infrastructure.Entities;
+using Crany.Auth.Services.Abstractions;
+using Crany.Shared.Entities.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Crany.Auth.Application.Services;
+namespace Crany.Auth.Services;
 
 public class TokenService(UserManager<ApplicationUser> userManager, IConfiguration config) : ITokenService
 {
@@ -15,10 +15,10 @@ public class TokenService(UserManager<ApplicationUser> userManager, IConfigurati
     {
         var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.UserName),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new Claim("uid", user.Id),
-            new Claim("api_key", user.ApiKey ?? string.Empty)
+            new(JwtRegisteredClaimNames.Sub, user.UserName),
+            new(ClaimTypes.Name, user.Email),   
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new("uid", user.Id)
         };
 
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));

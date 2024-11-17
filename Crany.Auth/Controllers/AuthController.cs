@@ -1,7 +1,7 @@
-using Crany.Auth.Application.Services.Abstractions;
-using Crany.Common.Attributes;
-using Crany.Auth.Infrastructure.Entities;
+using Crany.Shared.Attributes;
 using Crany.Auth.Models;
+using Crany.Auth.Services.Abstractions;
+using Crany.Shared.Entities.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;

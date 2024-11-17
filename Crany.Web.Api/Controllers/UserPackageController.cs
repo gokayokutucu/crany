@@ -1,22 +1,17 @@
-using Crany.Domain.Entities;
+using Crany.Shared.Entities;
 using Crany.Web.Api.Infrastructure.Context;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 
 namespace Crany.Web.Api.Controllers;
 
-[Route("api/v3/user/packages")]
+[ApiVersionNeutral]
+[Route("api/user/packages")]
 [ApiController]
-public class UserPackageController : ControllerBase
+[Authorize]
+public class UserPackageController(ApplicationDbContext context) : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
-
-    public UserPackageController(ApplicationDbContext context)
-    {
-        _context = context;
-    }
-
     private string GetUserIdFromToken()
     {
         return User.FindFirst("uid")?.Value ?? throw new UnauthorizedAccessException("User ID not found in token.");
@@ -25,13 +20,37 @@ public class UserPackageController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetUserPackages()
     {
+        // Extract the user ID from the token (assuming a helper method is available)
         var userId = GetUserIdFromToken();
 
-        var userPackages = await _context.UserPackages
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new { Message = "User ID could not be retrieved from the token." });
+        }
+
+        // Query the UserPackages for the logged-in user
+        var userPackages = await context.UserPackages
             .Where(up => up.UserId == userId)
-            .Include(up => up.Package)
+            .Join(
+                context.Packages,
+                userPackage => userPackage.PackageId,
+                package => package.Id,
+                (userPackage, package) => new
+                {
+                    PackageId = package.Id,
+                    PackageName = package.Name,
+                    Version = $"{package.MajorVersion}.{package.MinorVersion}.{package.PatchVersion}",
+                    userPackage.IsOwner
+                }
+            )
             .ToListAsync();
-        
+
+        // Check if no packages are associated with the user
+        if (userPackages.Count == 0)
+        {
+            return NotFound(new { Message = "No packages found for the current user." });
+        }
+
         return Ok(userPackages);
     }
 
@@ -40,8 +59,8 @@ public class UserPackageController : ControllerBase
     {
         userPackage.UserId = GetUserIdFromToken();
         
-        _context.UserPackages.Add(userPackage);
-        await _context.SaveChangesAsync();
+        context.UserPackages.Add(userPackage);
+        await context.SaveChangesAsync();
         
         return CreatedAtAction(nameof(GetUserPackages), userPackage);
     }
@@ -51,15 +70,15 @@ public class UserPackageController : ControllerBase
     {
         var userId = GetUserIdFromToken();
 
-        var userPackage = await _context.UserPackages
+        var userPackage = await context.UserPackages
             .Where(up => up.Id == userPackageId && up.UserId == userId)
             .FirstOrDefaultAsync();
 
         if (userPackage == null)
             return NotFound();
 
-        _context.UserPackages.Remove(userPackage);
-        await _context.SaveChangesAsync();
+        context.UserPackages.Remove(userPackage);
+        await context.SaveChangesAsync();
         
         return NoContent();
     }
