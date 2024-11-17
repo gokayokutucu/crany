@@ -1,4 +1,4 @@
-using Crany.Domain.Entities;
+using Crany.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -14,7 +14,5 @@ public class UserPackageConfiguration : IEntityTypeConfiguration<UserPackage>
             .HasMaxLength(36);
 
         builder.Property(up => up.IsOwner).IsRequired();
-        
-        builder.Ignore(up => up.Package);
     }
 }

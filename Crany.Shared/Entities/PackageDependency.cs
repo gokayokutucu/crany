@@ -1,10 +1,10 @@
-namespace Crany.Domain.Entities;
+namespace Crany.Shared.Entities;
 
 public class PackageDependency
 {
     public int DependencyId { get; set; }
     public int PackageId { get; set; }
-    public Package Package { get; set; }
+    
     public string DependencyName { get; set; }
     public int MajorVersion { get; set; }
     public int MinorVersion { get; set; }

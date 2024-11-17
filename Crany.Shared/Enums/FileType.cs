@@ -1,7 +1,8 @@
-namespace Crany.Domain.Entities.Enums;
+namespace Crany.Shared.Enums;
 
 public enum FileType
 {
     Proto,
+    Nupkg,
     Dll
 }

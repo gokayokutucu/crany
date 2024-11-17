@@ -1,4 +1,4 @@
-namespace Crany.Domain.Entities;
+namespace Crany.Shared.Entities;
 
 public class Package
 {
@@ -28,10 +28,7 @@ public class Package
     public string? RepositoryType { get; set; }
     public string? RepositoryUrl { get; set; }
     public bool IsVisible { get; set; } = true;
+    public string Checksum { get; set; }
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
     public int DownloadCount { get; set; } = 0; // Number of downloads
-    public ICollection<PackageDependency> Dependencies { get; set; } = new List<PackageDependency>();
-    public ICollection<File> Files { get; set; } = new List<File>();
-    public ICollection<UserPackage> UserPackages { get; set; } = new List<UserPackage>();
-    public ICollection<PackageTag> PackageTags { get; set; } = new List<PackageTag>();
 }

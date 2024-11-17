@@ -403,6 +403,7 @@ FodyWeavers.xsd
 *.pfx
 *.pem
 *.csr
+*.p12
 
 # MacOs
 .DS_Store

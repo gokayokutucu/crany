@@ -1,12 +1,11 @@
-using Crany.Domain.Entities.Enums;
+using Crany.Shared.Enums;
 
-namespace Crany.Domain.Entities;
+namespace Crany.Shared.Entities;
 
 public class File
 {
     public int Id { get; set; }
     public int PackageId { get; set; }
-    public Package Package { get; set; }
     public string FileName { get; set; }
     public string Content { get; set; } // Content of the file
     public string TargetPath { get; set; } // File path in the package
@@ -14,4 +13,5 @@ public class File
     public string? Description { get; set; }
     public string? Title { get; set; }
     public int? Weight { get; set; }
+    public string Checksum { get; set; }
 }

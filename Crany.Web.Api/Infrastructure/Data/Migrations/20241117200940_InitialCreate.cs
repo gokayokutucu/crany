@@ -13,6 +13,58 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "Files",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    PackageId = table.Column<int>(type: "integer", nullable: false),
+                    FileName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Content = table.Column<string>(type: "text", nullable: false),
+                    TargetPath = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    Type = table.Column<string>(type: "text", nullable: false),
+                    Description = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    Title = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    Weight = table.Column<int>(type: "integer", nullable: true),
+                    Checksum = table.Column<string>(type: "text", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Files", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PackageDependencies",
+                columns: table => new
+                {
+                    DependencyId = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    PackageId = table.Column<int>(type: "integer", nullable: false),
+                    DependencyName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    MajorVersion = table.Column<int>(type: "integer", nullable: false),
+                    MinorVersion = table.Column<int>(type: "integer", nullable: false),
+                    PatchVersion = table.Column<int>(type: "integer", nullable: false),
+                    PreReleaseTag = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    BuildMetadata = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PackageDependencies", x => x.DependencyId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PackageTags",
+                columns: table => new
+                {
+                    PackageId = table.Column<int>(type: "integer", nullable: false),
+                    TagId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PackageTags", x => new { x.PackageId, x.TagId });
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Packages",
                 columns: table => new
                 {
@@ -40,6 +92,10 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
                     AlternatePackage = table.Column<string>(type: "text", nullable: true),
                     AlternatePackageVersion = table.Column<string>(type: "text", nullable: true),
                     Readme = table.Column<string>(type: "text", nullable: true),
+                    RepositoryType = table.Column<string>(type: "text", nullable: true),
+                    RepositoryUrl = table.Column<string>(type: "text", nullable: true),
+                    IsVisible = table.Column<bool>(type: "boolean", nullable: false),
+                    Checksum = table.Column<string>(type: "text", nullable: false),
                     CreatedDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW()"),
                     DownloadCount = table.Column<int>(type: "integer", nullable: false, defaultValue: 0)
                 },
@@ -62,57 +118,6 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Files",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    PackageId = table.Column<int>(type: "integer", nullable: false),
-                    FileName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    Content = table.Column<string>(type: "text", nullable: false),
-                    TargetPath = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
-                    Type = table.Column<string>(type: "text", nullable: false),
-                    Description = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
-                    Title = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    Weight = table.Column<int>(type: "integer", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Files", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Files_Packages_PackageId",
-                        column: x => x.PackageId,
-                        principalTable: "Packages",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "PackageDependencies",
-                columns: table => new
-                {
-                    DependencyId = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    PackageId = table.Column<int>(type: "integer", nullable: false),
-                    DependencyName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    MajorVersion = table.Column<int>(type: "integer", nullable: false),
-                    MinorVersion = table.Column<int>(type: "integer", nullable: false),
-                    PatchVersion = table.Column<int>(type: "integer", nullable: false),
-                    PreReleaseTag = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
-                    BuildMetadata = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_PackageDependencies", x => x.DependencyId);
-                    table.ForeignKey(
-                        name: "FK_PackageDependencies_Packages_PackageId",
-                        column: x => x.PackageId,
-                        principalTable: "Packages",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "UserPackages",
                 columns: table => new
                 {
@@ -125,57 +130,7 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_UserPackages", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_UserPackages_Packages_PackageId",
-                        column: x => x.PackageId,
-                        principalTable: "Packages",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
                 });
-
-            migrationBuilder.CreateTable(
-                name: "PackageTags",
-                columns: table => new
-                {
-                    PackageId = table.Column<int>(type: "integer", nullable: false),
-                    TagId = table.Column<int>(type: "integer", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_PackageTags", x => new { x.PackageId, x.TagId });
-                    table.ForeignKey(
-                        name: "FK_PackageTags_Packages_PackageId",
-                        column: x => x.PackageId,
-                        principalTable: "Packages",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_PackageTags_Tags_TagId",
-                        column: x => x.TagId,
-                        principalTable: "Tags",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Files_PackageId",
-                table: "Files",
-                column: "PackageId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_PackageDependencies_PackageId",
-                table: "PackageDependencies",
-                column: "PackageId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_PackageTags_TagId",
-                table: "PackageTags",
-                column: "TagId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_UserPackages_PackageId",
-                table: "UserPackages",
-                column: "PackageId");
         }
 
         /// <inheritdoc />
@@ -191,13 +146,13 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
                 name: "PackageTags");
 
             migrationBuilder.DropTable(
-                name: "UserPackages");
+                name: "Packages");
 
             migrationBuilder.DropTable(
                 name: "Tags");
 
             migrationBuilder.DropTable(
-                name: "Packages");
+                name: "UserPackages");
         }
     }
 }

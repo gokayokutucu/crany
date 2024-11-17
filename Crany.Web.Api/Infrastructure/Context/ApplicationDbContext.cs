@@ -1,7 +1,7 @@
-using Crany.Domain.Entities;
+using Crany.Shared.Entities;
 using Crany.Web.Api.Infrastructure.Configurations;
 using Microsoft.EntityFrameworkCore;
-using File = Crany.Domain.Entities.File;
+using File = Crany.Shared.Entities.File;
 
 namespace Crany.Web.Api.Infrastructure.Context;
 

@@ -22,13 +22,17 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Crany.Domain.Entities.File", b =>
+            modelBuilder.Entity("Crany.Shared.Entities.File", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Checksum")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("Content")
                         .IsRequired()
@@ -64,12 +68,10 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PackageId");
-
                     b.ToTable("Files");
                 });
 
-            modelBuilder.Entity("Crany.Domain.Entities.Package", b =>
+            modelBuilder.Entity("Crany.Shared.Entities.Package", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -88,6 +90,10 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
                         .HasColumnType("character varying(256)");
 
                     b.Property<string>("BuildMetadata")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Checksum")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Copyright")
@@ -127,6 +133,9 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("LicenseUrl")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
@@ -159,6 +168,12 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
                         .HasMaxLength(35000)
                         .HasColumnType("character varying(35000)");
 
+                    b.Property<string>("RepositoryType")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RepositoryUrl")
+                        .HasColumnType("text");
+
                     b.Property<bool>("RequireLicenseAcceptance")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -177,7 +192,7 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
                     b.ToTable("Packages");
                 });
 
-            modelBuilder.Entity("Crany.Domain.Entities.PackageDependency", b =>
+            modelBuilder.Entity("Crany.Shared.Entities.PackageDependency", b =>
                 {
                     b.Property<int>("DependencyId")
                         .ValueGeneratedOnAdd()
@@ -212,12 +227,10 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
 
                     b.HasKey("DependencyId");
 
-                    b.HasIndex("PackageId");
-
                     b.ToTable("PackageDependencies");
                 });
 
-            modelBuilder.Entity("Crany.Domain.Entities.PackageTag", b =>
+            modelBuilder.Entity("Crany.Shared.Entities.PackageTag", b =>
                 {
                     b.Property<int>("PackageId")
                         .HasColumnType("integer");
@@ -227,12 +240,10 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
 
                     b.HasKey("PackageId", "TagId");
 
-                    b.HasIndex("TagId");
-
                     b.ToTable("PackageTags");
                 });
 
-            modelBuilder.Entity("Crany.Domain.Entities.Tag", b =>
+            modelBuilder.Entity("Crany.Shared.Entities.Tag", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -250,7 +261,7 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
                     b.ToTable("Tags");
                 });
 
-            modelBuilder.Entity("Crany.Domain.Entities.UserPackage", b =>
+            modelBuilder.Entity("Crany.Shared.Entities.UserPackage", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -271,75 +282,7 @@ namespace Crany.Web.Api.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PackageId");
-
                     b.ToTable("UserPackages");
-                });
-
-            modelBuilder.Entity("Crany.Domain.Entities.File", b =>
-                {
-                    b.HasOne("Crany.Domain.Entities.Package", "Package")
-                        .WithMany("Files")
-                        .HasForeignKey("PackageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Package");
-                });
-
-            modelBuilder.Entity("Crany.Domain.Entities.PackageDependency", b =>
-                {
-                    b.HasOne("Crany.Domain.Entities.Package", "Package")
-                        .WithMany("Dependencies")
-                        .HasForeignKey("PackageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Package");
-                });
-
-            modelBuilder.Entity("Crany.Domain.Entities.PackageTag", b =>
-                {
-                    b.HasOne("Crany.Domain.Entities.Package", "Package")
-                        .WithMany("PackageTags")
-                        .HasForeignKey("PackageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Crany.Domain.Entities.Tag", "Tag")
-                        .WithMany("PackageTags")
-                        .HasForeignKey("TagId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Package");
-
-                    b.Navigation("Tag");
-                });
-
-            modelBuilder.Entity("Crany.Domain.Entities.UserPackage", b =>
-                {
-                    b.HasOne("Crany.Domain.Entities.Package", null)
-                        .WithMany("UserPackages")
-                        .HasForeignKey("PackageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Crany.Domain.Entities.Package", b =>
-                {
-                    b.Navigation("Dependencies");
-
-                    b.Navigation("Files");
-
-                    b.Navigation("PackageTags");
-
-                    b.Navigation("UserPackages");
-                });
-
-            modelBuilder.Entity("Crany.Domain.Entities.Tag", b =>
-                {
-                    b.Navigation("PackageTags");
                 });
 #pragma warning restore 612, 618
         }

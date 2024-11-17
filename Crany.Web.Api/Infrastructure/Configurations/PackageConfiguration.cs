@@ -1,4 +1,4 @@
-using Crany.Domain.Entities;
+using Crany.Shared.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

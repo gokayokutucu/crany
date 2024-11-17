@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 
-namespace Crany.Auth.Infrastructure.Entities;
+namespace Crany.Shared.Entities.Identity;
 
 public class ApplicationUserRole : IdentityUserRole<string>
 {

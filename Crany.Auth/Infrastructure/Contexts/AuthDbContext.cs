@@ -1,4 +1,5 @@
-using Crany.Auth.Infrastructure.Entities;
+using Crany.Shared.Abstractions.Context;
+using Crany.Shared.Entities.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +10,7 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options)
     : IdentityDbContext<ApplicationUser, ApplicationRole, string,
         ApplicationUserClaim, ApplicationUserRole,
         IdentityUserLogin<string>, IdentityRoleClaim<string>,
-        IdentityUserToken<string>>(options)
+        IdentityUserToken<string>>(options), IAuthDbContext
 {
     protected override void OnModelCreating(ModelBuilder builder)
     {
