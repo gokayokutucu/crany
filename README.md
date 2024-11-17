@@ -90,7 +90,7 @@ The following endpoints are available in Crany Repository Manager:
 Contributions are welcome! Feel free to fork the repository, create issues, and submit pull requests.
 
 ## License
-This project is licensed under the MIT License.
+This project is licensed under the [MIT License](./LICENSE.MD).
 
 ## Questions?
 If you encounter issues or have questions, please contact the repository maintainers or open an issue in the GitHub repository.
