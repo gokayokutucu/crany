@@ -27,6 +27,7 @@
 
     <ItemGroup>
       <Folder Include="Infrastructure\Data\" />
+      <Folder Include="PackageStorage\" />
     </ItemGroup>
 
 </Project>

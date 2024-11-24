@@ -11,7 +11,7 @@ public class FileConfiguration : IEntityTypeConfiguration<File>
     {
         builder.HasKey(f => f.Id);
         builder.Property(f => f.FileName).IsRequired().HasMaxLength(256);
-        builder.Property(f => f.Content).IsRequired();
+        builder.Property(f => f.Content);
         builder.Property(f => f.TargetPath).IsRequired().HasMaxLength(512);
         builder.Property(f => f.Type).IsRequired().HasConversion<string>();
         builder.Property(f => f.Description).HasMaxLength(4000);

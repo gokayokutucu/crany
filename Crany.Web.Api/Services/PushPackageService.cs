@@ -15,51 +15,87 @@ public class PushPackageService(ILogger<PushPackageService> logger, ApplicationD
 {
     public async Task<(bool Success, string Message)> PushPackageAsync(string? userUid, IFormFile? packageFile)
     {
-        if (string.IsNullOrEmpty(userUid))
+        string tempSavePath = string.Empty;
+        string savePath = string.Empty;
+        
+        try
         {
-            return (false, "No user provided.");
-        }
+            if (string.IsNullOrEmpty(userUid))
+            {
+                return (false, "No user provided.");
+            }
 
-        if (packageFile == null || packageFile.Length == 0)
+            if (packageFile == null || packageFile.Length == 0)
+            {
+                return (false, "No package file provided.");
+            }
+
+            if (packageFile.Length > 1048576)
+            {
+                return (false, "File size exceeds the 1 MB limit.");
+            }
+
+            // Validate the file and get checksum
+            var (isValid, checksum) = await ValidatePackageFile(packageFile);
+            if (!isValid)
+            {
+                return (false, "Invalid or duplicate package file.");
+            }
+
+            // Save the package file to disk
+            tempSavePath = SaveTempPackageToDisk(packageFile);
+
+            // Extract package metadata, proto files, and tags
+            var (package, packageDependencies, protoFiles, tags) = ExtractPackageAndProtoFiles(tempSavePath);
+            if (package == null)
+            {
+                return (false, "Failed to extract package metadata or proto files.");
+            }
+
+            savePath = RenamePackageFile(tempSavePath, package.Name,
+                $"{package.MajorVersion}.{package.MinorVersion}.{package.PatchVersion}");
+
+            // Set checksum for the package
+            package.Checksum = checksum;
+
+            // Save all related entities to the database
+            await SavePackageData(userUid, package, protoFiles, tags, packageDependencies, savePath);
+
+            return (true, "Package pushed successfully.");
+        }
+        catch (Exception e)
         {
-            return (false, "No package file provided.");
+            if (string.IsNullOrEmpty(savePath) || !System.IO.File.Exists(savePath)) throw;
+            try
+            {
+                System.IO.File.Delete(savePath);
+                logger.LogInformation(e, "Renamed file deleted due to error: {SavePath}", savePath);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to delete renamed file: {SavePath}", savePath);
+            }
+            throw;
         }
-
-        if (packageFile.Length > 1048576)
+        finally
         {
-            return (false, "File size exceeds the 1 MB limit.");
+            // Ensure temporary files are cleaned up
+            if (!string.IsNullOrEmpty(tempSavePath) && System.IO.File.Exists(tempSavePath))
+            {
+                try
+                {
+                    System.IO.File.Delete(tempSavePath);
+                    logger.LogInformation("Temporary file deleted: {TempSavePath}", tempSavePath);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to delete temporary file: {TempSavePath}", tempSavePath);
+                }
+            }
         }
-
-        // Validate the file and get checksum
-        var (isValid, checksum) = await ValidatePackageFile(packageFile);
-        if (!isValid)
-        {
-            return (false, "Invalid or duplicate package file.");
-        }
-
-        // Save the package file to disk
-        var savePath = SavePackageToDisk(packageFile);
-
-        // Save Nupkg file path to the database
-        await AddPackagePathToFiles(savePath, checksum);
-
-        // Extract package metadata, proto files, and tags
-        var (package, packageDependencies, protoFiles, tags) = ExtractPackageAndProtoFiles(savePath);
-        if (package == null)
-        {
-            return (false, "Failed to extract package metadata or proto files.");
-        }
-
-        // Set checksum for the package
-        package.Checksum = checksum;
-
-        // Save all related entities to the database
-        await SavePackageData(userUid, package, protoFiles, tags, packageDependencies);
-
-        return (true, "Package pushed successfully.");
     }
 
-    private async Task AddPackagePathToFiles(string savePath, string checksum)
+    private async Task AddPackagePathToFiles(string savePath, string checksum, int packageId)
     {
         // Ensure that the path and checksum are valid
         if (string.IsNullOrWhiteSpace(savePath) || string.IsNullOrWhiteSpace(checksum))
@@ -67,15 +103,16 @@ public class PushPackageService(ILogger<PushPackageService> logger, ApplicationD
             throw new ArgumentException("Invalid savePath or checksum");
         }
 
-        var nupkgFile = await context.Files.FirstOrDefaultAsync(f => f.Checksum == checksum);
+        var existingFile = await context.Files.FirstOrDefaultAsync(f => f.Checksum == checksum);
 
-        if (nupkgFile is null)
+        if (existingFile is not null)
         {
             return;
         }
 
-        nupkgFile = new File
+        var nupkgFile = new File
         {
+            PackageId = packageId,
             FileName = Path.GetFileName(savePath),
             TargetPath = savePath,
             Type = FileType.Nupkg,
@@ -106,12 +143,22 @@ public class PushPackageService(ILogger<PushPackageService> logger, ApplicationD
         }
     }
 
-    private string SavePackageToDisk(IFormFile packageFile)
+    private static string RenamePackageFile(string tempSavePath, string id, string version)
+    {
+        var uniqueFileName = $"{id}.{version}.nupkg";
+        var finalSavePath = Path.Combine(Path.GetDirectoryName(tempSavePath)!, uniqueFileName);
+
+        System.IO.File.Move(tempSavePath, finalSavePath);
+        return finalSavePath;
+    }
+
+    private static string SaveTempPackageToDisk(IFormFile packageFile)
     {
         var packageDirectory = Path.Combine(Directory.GetCurrentDirectory(), "PackageStorage");
         Directory.CreateDirectory(packageDirectory);
 
-        var savePath = Path.Combine(packageDirectory, packageFile.FileName);
+        var uniqueFileName = $"{Guid.NewGuid()}.nupkg";
+        var savePath = Path.Combine(packageDirectory, uniqueFileName);
         using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write);
         packageFile.CopyTo(fileStream);
 
@@ -119,7 +166,7 @@ public class PushPackageService(ILogger<PushPackageService> logger, ApplicationD
     }
 
     private async Task SavePackageData(string userUid, Package package, List<File> protoFiles, List<Tag> tags,
-        List<PackageDependency> dependencies)
+        List<PackageDependency> dependencies, string savePath)
     {
         await using var transaction = await context.Database.BeginTransactionAsync();
         try
@@ -175,6 +222,9 @@ public class PushPackageService(ILogger<PushPackageService> logger, ApplicationD
                 PackageId = package.Id,
                 IsOwner = true // Assuming the uploader is the owner
             });
+            
+            // Save Nupkg file path to the database
+            await AddPackagePathToFiles(savePath, package.Checksum, package.Id);
 
             // Save proto files and associate them with the package
             foreach (var protoFile in protoFiles)
@@ -186,7 +236,7 @@ public class PushPackageService(ILogger<PushPackageService> logger, ApplicationD
 
             // Save all changes to the database
             await context.SaveChangesAsync();
-            
+
             await transaction.CommitAsync();
         }
         catch (Exception ex)

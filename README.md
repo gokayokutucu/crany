@@ -5,13 +5,29 @@ manage your own private NuGet packages. It's designed to be simple yet powerful,
 CI/CD pipelines.
 
 ---
+
+## Purpose
+
+Crany Repository Manager was specifically developed to manage and version **Protobuf** files, ensuring that updated versions are always accessible and synchronized across all clients. This simplifies the distribution and usage of Protobuf files, enabling developers to:
+
+- Easily **version Protobuf files** for different services or applications.
+- Manage **dependencies** between Protobuf files seamlessly.
+- Ensure that **all clients** have access to the latest Protobuf versions without manual intervention.
+
+With Crany, you can also manage Protobuf dependencies alongside your Protobuf files, simplifying the setup process for all developers and services consuming these files.
+
+---
+
 ## Features
+
 - **Lightweight and Self-Contained**: No external dependencies, runs directly on your .NET setup.
 - **Secure API Key Authentication**: Ensures only authorized clients can interact with your repository.
 - **Flexible Hosting**: Supports self-hosted configurations, including HTTPS with self-signed certificates.
+- **Protobuf Dependency Management**: Handles dependencies within Protobuf files to reduce manual configuration.
 - **NuGet v3 Protocol**: Fully compatible with the latest NuGet clients.
 
 ---
+
 ## Getting Started
 ### Prerequisites
 

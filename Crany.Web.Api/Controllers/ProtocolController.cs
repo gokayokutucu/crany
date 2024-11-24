@@ -2,16 +2,18 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Crany.Shared.Enums;
 using Crany.Shared.Models;
+using Crany.Shared.Models.PackageInfos;
 using Crany.Web.Api.Infrastructure.Context;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PackageVersionRoot = Crany.Shared.Models.RegistrationIndex.PackageVersionRoot;
 
 namespace Crany.Web.Api.Controllers;
 
 [ApiVersionNeutral]
 [Route("api")]
 [ApiController]
-public class ProtocolController(ApplicationDbContext context) : ControllerBase
+public class ProtocolController(ApplicationDbContext context, ILogger<ProtocolController> logger) : ControllerBase
 {
     // /api/v3/index.json
     [HttpGet("v3/index.json")]
@@ -32,6 +34,18 @@ public class ProtocolController(ApplicationDbContext context) : ControllerBase
                     Type = "PackageBaseAddress/3.0.0",
                     Comment =
                         "Base URL of where NuGet packages are stored, in the format {baseUrl}/api/v3-flatcontainer/{id}/{version}/{filename}.nupkg"
+                },
+                new Resource
+                {
+                    Id = $"{baseUrl}/api/v3/registration5-semver1/",
+                    Type = "RegistrationsBaseUrl/3.6.0",
+                    Comment = "Base URL of registration blobs"
+                },
+                new Resource
+                {
+                    Id = $"{baseUrl}/api/v3/registration5-gz-semver2/",
+                    Type = "RegistrationsBaseUrl/3.6.0",
+                    Comment = "Base URL of compressed registration blobs supporting SemVer 2.0.0."
                 },
                 new Resource
                 {
@@ -78,7 +92,7 @@ public class ProtocolController(ApplicationDbContext context) : ControllerBase
                 },
                 new Resource
                 {
-                    Id = $"{baseUrl}/api/v3/flatcontainer/{{id}}/index.json",
+                    Id = $"{baseUrl}/api/v3-flatcontainer/{{id}}/index.json",
                     Type = "PackageVersionsUriTemplate/3.0.0",
                     Comment = "URL for fetching all versions of a specific package."
                 },
@@ -155,18 +169,25 @@ public class ProtocolController(ApplicationDbContext context) : ControllerBase
     //     return Ok(catalog);
     // }
 
-    [HttpGet("flatcontainer/{id}/{version}/{filename}.nupkg")]
+    [HttpGet("v3-flatcontainer/{id}/{version}/{filename}")]
     public async Task<IActionResult> DownloadPackageFile(string id, string version, string filename)
     {
         // Normalize inputs for case-insensitivity
-        var normalizedId = id.ToLower();
-        var normalizedVersion = version.ToLower();
-        var normalizedFilename = filename.ToLower();
+        var normalizedId = id.ToLowerInvariant();
+        var normalizedVersion = version.ToLowerInvariant();
+        var normalizedFilename = filename.ToLowerInvariant();
 
         // Ensure the filename matches the package ID and version
         if (normalizedFilename != $"{normalizedId}.{normalizedVersion}.nupkg")
         {
-            return BadRequest("Filename should match the package ID and version in the format 'id.version.nupkg'.");
+            return BadRequest(new
+                { Message = "Filename should match the package ID and version in the format 'id.version.nupkg'." });
+        }
+
+        // Parse version numbers
+        if (!TryParseVersion(normalizedVersion, out var majorVersion, out var minorVersion, out var patchVersion))
+        {
+            return BadRequest(new { Message = "Invalid version format. Expected format: 'major.minor.patch'." });
         }
 
         // Query the file associated with the package ID and version
@@ -179,56 +200,388 @@ public class ProtocolController(ApplicationDbContext context) : ControllerBase
             )
             .Where(fp =>
                 fp.package.Name.ToLower() == normalizedId &&
-                $"{fp.package.MajorVersion}.{fp.package.MinorVersion}.{fp.package.PatchVersion}".ToLower() ==
-                normalizedVersion &&
-                fp.file.Type == FileType.Nupkg) // Ensures we are fetching the correct file type
+                fp.package.MajorVersion == majorVersion &&
+                fp.package.MinorVersion == minorVersion &&
+                fp.package.PatchVersion == patchVersion &&
+                fp.file.Type == FileType.Nupkg)
             .Select(fp => fp.file)
             .FirstOrDefaultAsync();
 
         if (file == null)
         {
-            return NotFound(new { Message = "Package file not found for the given ID and version." });
+            return NotFound(new { Message = $"Package file not found for ID '{id}' and version '{version}'." });
         }
 
         // Validate the physical file path exists
         if (!System.IO.File.Exists(file.TargetPath))
         {
-            return NotFound(new { Message = "Physical file not found on the server." });
+            logger.LogError("Physical file not found: {FilePath}", file.TargetPath);
+            return NotFound(new
+                { Message = $"Physical file not found on the server for ID '{id}' and version '{version}'." });
         }
 
+        logger.LogInformation("Serving package file: {FilePath}", file.TargetPath);
+
+        // Return the file for download
         return PhysicalFile(
             file.TargetPath,
             "application/octet-stream",
-            $"{normalizedId}.{normalizedVersion}.nupkg"
+            file.FileName
         );
     }
 
-    [HttpGet("query")]
-    public async Task<IActionResult> SearchQuery([FromQuery] string q, [FromQuery] bool prerelease = false)
+    private bool TryParseVersion(string version, out int major, out int minor, out int patch)
     {
-        var packages = await context.Packages
-            .Where(p => (p.Name.Contains(q) || (p.Description != null && p.Description.Contains(q))))
-            .Where(p => prerelease || p.PreReleaseTag == null)
-            .ToListAsync();
+        major = minor = patch = 0;
 
-        return Ok(packages);
+        var parts = version.Split('.');
+        if (parts.Length != 3 ||
+            !int.TryParse(parts[0], out major) ||
+            !int.TryParse(parts[1], out minor) ||
+            !int.TryParse(parts[2], out patch))
+        {
+            return false;
+        }
+
+        return true;
     }
 
-    // Package Versions Endpoint
-    [HttpGet("flatcontainer/{id}/index.json")]
-    public async Task<IActionResult> GetPackageVersions(int id)
+    [HttpGet("v3/registration5-semver1")]
+    public async Task<IActionResult> GetRegistrationIndex()
     {
+        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+
+        // Paketleri çek
+        var packages = await context.Packages.ToListAsync();
+
+        // PackageTag ve Tag verilerini ayrı olarak çek
+        var packageTags = await context.PackageTags.ToListAsync();
+        var tags = await context.Tags.ToListAsync();
+
+        // Dependencies verisini çek
+        var dependencies = await context.PackageDependencies.ToListAsync();
+
+        // Paketlerin detaylarını oluştur
+        var packageItems = packages
+            .GroupBy(p => p.Name.ToLower())
+            .Select(group => new Crany.Shared.Models.RegistrationIndex.PackageVersionGroup
+            {
+                Id = $"{baseUrl}/api/v3/registration5-semver1/{group.Key}/index.json",
+                Count = group.Count(),
+                Lower = group.Min(pkg => $"{pkg.MajorVersion}.{pkg.MinorVersion}.{pkg.PatchVersion}"),
+                Upper = group.Max(pkg => $"{pkg.MajorVersion}.{pkg.MinorVersion}.{pkg.PatchVersion}"),
+                Parent = $"{baseUrl}/api/v3/registration5-semver1/",
+                Items = group.Select(package => new Crany.Shared.Models.PackageVersionItem
+                {
+                    Id =
+                        $"{baseUrl}/api/v3/registration5-semver1/{package.Name.ToLower()}/{package.MajorVersion}.{package.MinorVersion}.{package.PatchVersion}.json",
+                    CatalogEntry = new Crany.Shared.Models.CatalogEntry
+                    {
+                        Id =
+                            $"{baseUrl}/api/v3/registration5-semver1/{package.Name.ToLower()}/{package.MajorVersion}.{package.MinorVersion}.{package.PatchVersion}.json",
+                        PackageId = package.Name,
+                        PackageContent =
+                            $"{baseUrl}/api/v3-flatcontainer/{package.Name.ToLower()}/{package.MajorVersion}.{package.MinorVersion}.{package.PatchVersion}/{package.Name.ToLower()}.{package.MajorVersion}.{package.MinorVersion}.{package.PatchVersion}.nupkg",
+                        Version = $"{package.MajorVersion}.{package.MinorVersion}.{package.PatchVersion}",
+                        Description = package.Description,
+                        Authors = package.Authors,
+                        Tags = packageTags
+                            .Where(pt => pt.PackageId == package.Id)
+                            .Join(tags, pt => pt.TagId, t => t.Id, (pt, t) => t.Name)
+                            .ToList(),
+                        Dependencies = dependencies
+                            .Where(d => d.PackageId == package.Id)
+                            .Select(d => new Crany.Shared.Models.Dependency
+                            {
+                                Id = d.DependencyName,
+                                VersionRange = $"[{d.MajorVersion}.{d.MinorVersion}.{d.PatchVersion}, )"
+                            }).ToList(),
+                        Published = package.CreatedDate.ToUniversalTime(),
+                        LicenseUrl = "https://opensource.org/licenses/MIT"
+                    }
+                }).ToList()
+            }).ToList();
+
+        // Root nesnesini oluştur
+        var packageVersionRoot = new Crany.Shared.Models.RegistrationIndex.PackageVersionRoot
+        {
+            Id = $"{baseUrl}/api/v3/registration5-semver1/",
+            CommitId = Guid.NewGuid().ToString(),
+            CommitTimeStamp = DateTime.UtcNow,
+            Count = packageItems.Count,
+            Items = packageItems
+        };
+
+        return Ok(packageVersionRoot);
+    }
+
+    [HttpGet("registration5-semver1/{id}/index.json")]
+    public async Task<IActionResult> GetRegistrationPage(string id)
+    {
+        var normalizedId = id.ToLower();
+
+        // Paket sürümlerini getir
+        var packages = await context.Packages
+            .Where(p => p.Name.ToLower() == normalizedId)
+            .OrderBy(p => p.MajorVersion)
+            .ThenBy(p => p.MinorVersion)
+            .ThenBy(p => p.PatchVersion)
+            .ToListAsync();
+
+        if (!packages.Any())
+        {
+            return NotFound(new { Message = $"Package '{id}' not found." });
+        }
+
+        // Temel URL
+        var baseUrl = $"{Request.Scheme}://{Request.Host}/api/v3/registration5-semver1/{normalizedId}";
+
+        // `lower` ve `upper` sürüm bilgilerini belirle
+        var lowerVersion =
+            $"{packages.First().MajorVersion}.{packages.First().MinorVersion}.{packages.First().PatchVersion}";
+        var upperVersion =
+            $"{packages.Last().MajorVersion}.{packages.Last().MinorVersion}.{packages.Last().PatchVersion}";
+
+        // Sürüm bilgilerini oluştur
+        var items = packages.Select(p => new
+        {
+            Id = $"{baseUrl}/{p.MajorVersion}.{p.MinorVersion}.{p.PatchVersion}.json",
+            CatalogEntry = new
+            {
+                Id = $"{baseUrl}/{p.MajorVersion}.{p.MinorVersion}.{p.PatchVersion}.json",
+                PackageId = p.Name,
+                Version = $"{p.MajorVersion}.{p.MinorVersion}.{p.PatchVersion}",
+                Description = p.Description,
+                Authors = p.Authors,
+                Tags = string.IsNullOrWhiteSpace(p.Tags)
+                    ? new List<string>()
+                    : p.Tags.Split(", ", StringSplitOptions.RemoveEmptyEntries).ToList(),
+                Dependencies = context.PackageDependencies
+                    .Where(d => d.PackageId == p.Id)
+                    .Select(d => new
+                    {
+                        Id = d.DependencyName,
+                        VersionRange = $"[{d.MajorVersion}.{d.MinorVersion}.{d.PatchVersion}, )"
+                    })
+                    .ToList(),
+                Published = p.CreatedDate.ToUniversalTime(),
+                LicenseUrl = "https://opensource.org/licenses/MIT",
+                PackageContent =
+                    $"{Request.Scheme}://{Request.Host}/api/v3-flatcontainer/{normalizedId}/{p.MajorVersion}.{p.MinorVersion}.{p.PatchVersion}/{normalizedId}.{p.MajorVersion}.{p.MinorVersion}.{p.PatchVersion}.nupkg"
+            }
+        }).ToList();
+
+        // Yanıt oluştur
+        var response = new
+        {
+            Id = $"{baseUrl}/index.json",
+            Count = items.Count,
+            Lower = lowerVersion,
+            Upper = upperVersion,
+            Parent = $"{Request.Scheme}://{Request.Host}/api/v3/registration5-semver1/",
+            Items = items
+        };
+
+        return Ok(response);
+    }
+
+    [HttpGet("v3/registration5-semver1/{id}/{version}.json")]
+    public async Task<IActionResult> GetRegistrationLeaf(string id, string version)
+    {
+        var normalizedId = id.ToLower();
+        var normalizedVersion = version.ToLower();
+
+        if (!TryParseVersion(normalizedVersion, out var majorVersion, out var minorVersion, out var patchVersion))
+        {
+            return BadRequest(new { Message = "Invalid version format. Expected format: 'major.minor.patch'." });
+        }
+
+        // İlgili paketi ve sürümü al
+        var package = await context.Packages
+            .Where(p => p.Name.ToLower() == normalizedId &&
+                        p.MajorVersion == majorVersion &&
+                        p.MinorVersion == minorVersion &&
+                        p.PatchVersion == patchVersion
+            )
+            .FirstOrDefaultAsync();
+
+        if (package == null)
+        {
+            return NotFound(new { Message = $"Package '{id}' version '{version}' not found." });
+        }
+
+        // Dependencies'leri getir
+        var dependencies = await context.PackageDependencies
+            .Where(d => d.PackageId == package.Id)
+            .Select(d => new Dependency()
+            {
+                Id = d.DependencyName,
+                VersionRange = $"[{d.MajorVersion}.{d.MinorVersion}.{d.PatchVersion}, )"
+            })
+            .ToListAsync();
+
+        // Response JSON
+        var baseUrl = $"{Request.Scheme}://{Request.Host}/api/v3";
+        var response = new Crany.Shared.Models.RegistrationLeaf.PackageVersionRoot
+        {
+            Id = $"{baseUrl}/registration5-semver1/{normalizedId}/{normalizedVersion}.json",
+            CatalogEntry = new CatalogEntry
+            {
+                Id = $"{baseUrl}/registration5-semver1/{normalizedId}/{normalizedVersion}.json",
+                PackageId = package.Name,
+                Version = $"{package.MajorVersion}.{package.MinorVersion}.{package.PatchVersion}",
+                Authors = package.Authors,
+                Description = package.Description,
+                Tags = string.IsNullOrWhiteSpace(package.Tags)
+                    ? []
+                    : package.Tags.Split(", ", StringSplitOptions.RemoveEmptyEntries).ToList(),
+                Dependencies = dependencies,
+                Published = package.CreatedDate.ToUniversalTime(),
+                LicenseUrl = "https://opensource.org/licenses/MIT"
+            },
+            PackageContent =
+                $"{baseUrl}-flatcontainer/{normalizedId}/{normalizedVersion}/{normalizedId}.{normalizedVersion}.nupkg",
+            Registration = $"{baseUrl}/registration5-semver1/{normalizedId}/index.json"
+        };
+
+        return Ok(response);
+    }
+
+    [HttpGet("v3/registration5-gz-semver2/{id}/index.json")]
+    public async Task<IActionResult> GetPackageRegistration(string id)
+    {
+        // Normalize ID for case-insensitivity
+        var normalizedId = id.ToLower();
+
+        // Fetch all versions of the specified package
+        var packages = await context.Packages
+            .Where(p => p.Name.ToLower() == normalizedId)
+            .OrderBy(p => p.MajorVersion)
+            .ThenBy(p => p.MinorVersion)
+            .ThenBy(p => p.PatchVersion)
+            .ToListAsync();
+
+        if (!packages.Any())
+        {
+            return NotFound(new { Message = $"Package '{id}' not found." });
+        }
+
+        var baseUrl = $"{Request.Scheme}://{Request.Host}/api/v3/registration5-gz-semver2/{normalizedId}";
+
+        // Create PackageVersionGroups
+        var packageVersionGroups = packages.GroupBy(p => $"{p.MajorVersion}.{p.MinorVersion}.{p.PatchVersion}")
+            .Select(group => new Crany.Shared.Models.RegistrationIndex.PackageVersionGroup
+            {
+                Id = $"{baseUrl}/{group.Key}.json",
+                Count = group.Count(),
+                Lower = group.Key,
+                Upper = group.Key,
+                Parent = $"{baseUrl}/index.json",
+                Items = group.Select(package => new Crany.Shared.Models.PackageVersionItem
+                {
+                    Id = $"{baseUrl}/{package.MajorVersion}.{package.MinorVersion}.{package.PatchVersion}.json",
+                    CatalogEntry = new Crany.Shared.Models.CatalogEntry
+                    {
+                        Id = $"{baseUrl}/{package.MajorVersion}.{package.MinorVersion}.{package.PatchVersion}.json",
+                        PackageId = package.Name,
+                        Version = $"{package.MajorVersion}.{package.MinorVersion}.{package.PatchVersion}",
+                        Description = package.Description,
+                        Authors = package.Authors,
+                        Tags = string.IsNullOrWhiteSpace(package.Tags)
+                            ? new List<string>()
+                            : package.Tags.Split(", ", StringSplitOptions.RemoveEmptyEntries).ToList(),
+                        Dependencies = context.PackageDependencies
+                            .Where(d => d.PackageId == package.Id)
+                            .Select(d => new Crany.Shared.Models.Dependency
+                            {
+                                Id = d.DependencyName,
+                                VersionRange = $"[{d.MajorVersion}.{d.MinorVersion}.{d.PatchVersion}, )"
+                            }).ToList(),
+                        Published = package.CreatedDate.ToUniversalTime(),
+                        LicenseUrl = "https://opensource.org/licenses/MIT",
+                        PackageContent =
+                            $"{Request.Scheme}://{Request.Host}/api/v3-flatcontainer/{normalizedId}/{group.Key}/{normalizedId}.{group.Key}.nupkg"
+                    }
+                }).ToList()
+            }).ToList();
+
+        // Create PackageVersionRoot
+        var packageVersionRoot = new Crany.Shared.Models.RegistrationIndex.PackageVersionRoot
+        {
+            Id = $"{baseUrl}/index.json",
+            CommitId = Guid.NewGuid().ToString(),
+            CommitTimeStamp = DateTime.UtcNow,
+            Count = packageVersionGroups.Count,
+            Items = packageVersionGroups
+        };
+
+        return Ok(packageVersionRoot);
+    }
+
+    [HttpGet("query")]
+    public async Task<IActionResult> SearchPackages([FromQuery] string q)
+    {
+        var query = q?.ToLower() ?? string.Empty;
+
+        var packages = await context.Packages
+            .Where(p => p.Name.ToLower().Contains(query) ||
+                        p.Description.ToLower().Contains(query) ||
+                        p.Tags.ToLower().Contains(query))
+            .ToListAsync();
+
+        if (!packages.Any())
+        {
+            return NotFound(new { Message = "No packages found matching the query." });
+        }
+
+        var response = new
+        {
+            totalHits = packages.Count,
+            data = packages.Select(p => new
+            {
+                id = p.Name,
+                version = $"{p.MajorVersion}.{p.MinorVersion}.{p.PatchVersion}",
+                description = p.Description,
+                authors = p.Authors,
+                tags = string.IsNullOrWhiteSpace(p.Tags)
+                    ? []
+                    : p.Tags.Split(", ", StringSplitOptions.RemoveEmptyEntries),
+                versions = context.Packages
+                    .Where(v => v.Name == p.Name)
+                    .OrderBy(v => v.MajorVersion)
+                    .ThenBy(v => v.MinorVersion)
+                    .ThenBy(v => v.PatchVersion)
+                    .Select(v => new
+                    {
+                        version = $"{v.MajorVersion}.{v.MinorVersion}.{v.PatchVersion}",
+                        downloads = v.DownloadCount
+                    })
+            })
+        };
+
+        return Ok(response);
+    }
+
+
+    [HttpGet("v3-flatcontainer/{id}/index.json")]
+    public async Task<IActionResult> GetPackageVersions(string id)
+    {
+        var normalizedId = id.ToLower();
+
         var packageVersions = await context.Packages
-            .Where(p => p.Id == id)
+            .Where(p => p.Name.ToLower() == normalizedId)
+            .OrderBy(p => p.MajorVersion)
+            .ThenBy(p => p.MinorVersion)
+            .ThenBy(p => p.PatchVersion)
             .Select(p => $"{p.MajorVersion}.{p.MinorVersion}.{p.PatchVersion}")
             .ToListAsync();
 
-        if (!packageVersions.Any())
+        if (packageVersions.Count == 0)
             return NotFound();
 
         Response.ContentType = "application/json";
 
-        return Ok(packageVersions);
+        return Ok(new { Versions = packageVersions });
     }
 
     // Download Count and Statistics Endpoint (Optional)
