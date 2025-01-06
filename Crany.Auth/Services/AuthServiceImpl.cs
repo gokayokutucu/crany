@@ -12,7 +12,7 @@ public class AuthServiceImpl(IAuthDbContext dbContext) : AuthService.AuthService
     {
         var userUId = await dbContext.Users
             .Where(u => u.ApiKey == request.ApiKey && u.IsActive)
-            .Select(u => u.ApiKey)
+            .Select(u => u.Id)
             .FirstOrDefaultAsync();
 
         if (string.IsNullOrEmpty(userUId))
