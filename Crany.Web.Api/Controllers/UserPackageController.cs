@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Crany.Web.Api.Controllers;
 
 [ApiVersionNeutral]
-[Route("api/user/packages")]
+[Route("api/user")]
 [ApiController]
 [Authorize]
 public class UserPackageController(ApplicationDbContext context) : ControllerBase
@@ -17,7 +17,7 @@ public class UserPackageController(ApplicationDbContext context) : ControllerBas
         return User.FindFirst("uid")?.Value ?? throw new UnauthorizedAccessException("User ID not found in token.");
     }
 
-    [HttpGet]
+    [HttpGet("packages")]
     public async Task<IActionResult> GetUserPackages()
     {
         // Extract the user ID from the token (assuming a helper method is available)
@@ -54,7 +54,7 @@ public class UserPackageController(ApplicationDbContext context) : ControllerBas
         return Ok(userPackages);
     }
 
-    [HttpPost]
+    [HttpPost("packages")]
     public async Task<IActionResult> AddUserPackage([FromBody] UserPackage userPackage)
     {
         userPackage.UserId = GetUserIdFromToken();
@@ -65,7 +65,7 @@ public class UserPackageController(ApplicationDbContext context) : ControllerBas
         return CreatedAtAction(nameof(GetUserPackages), userPackage);
     }
 
-    [HttpDelete("{userPackageId}")]
+    [HttpDelete("packages/{userPackageId}")]
     public async Task<IActionResult> RemoveUserPackage(int userPackageId)
     {
         var userId = GetUserIdFromToken();
