@@ -63,9 +63,28 @@ To ensure your client doesn’t use stale or cached package data:
    dotnet nuget locals http-cache --clear
    ```
 
-### Pushing a Package
+### Pack a Nuspec File
+Use the crany pack command to generate a NuGet package from a .nuspec file:
 
-Use the following command to push a NuGet package to the Crany Repository Manager:
+   ```*bash*
+   crany pack CustomTypesProto.nuspec --output-dir ./packages
+   ```
+
+This will create a NuGet package in the specified output directory.
+
+To push the generated package to a NuGet source, use the following command:
+
+   ```*bash*
+   crany pack CustomTypesProto.nuspec --output-dir ./packages --push --api-key 7e5e1274-b271-4ad3-85f0-a1e1925126b2 --source https://localhost:5001/api/v3/index.json
+   ```
+
+This will:
+1.	Pack the .nuspec file into a NuGet package.
+2.	Push the resulting .nupkg file to the specified NuGet source.
+
+### Pushing a Package (Using dotnet)
+
+Alternatively, use dotnet nuget push to manually push a package to the repository:
 
    ```*bash*
    dotnet nuget push GreetProtos.1.0.3.nupkg \
@@ -110,3 +129,7 @@ This project is licensed under the [MIT License](./LICENSE.MD).
 
 ## Questions?
 If you encounter issues or have questions, please contact the repository maintainers or open an issue in the GitHub repository.
+
+### Updates
+- Added `crany pack` and `crany push` commands with explanations and examples.
+- Structured the usage section for clarity.
