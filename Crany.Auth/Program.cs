@@ -108,7 +108,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v3", new OpenApiInfo { Title = "Identity API", Version = "v3" });
+    c.SwaggerDoc("v3", new OpenApiInfo { Title = "Crany API", Version = "v3" });
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
